@@ -6,6 +6,7 @@ use App\Http\Resources\PerformanceReviewResource;
 use App\Models\PerformanceReview;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\View;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class PerformanceReviewController extends Controller
@@ -119,29 +120,51 @@ class PerformanceReviewController extends Controller
 
     /**
      * Export a single review to PDF (if you can view it).
+     * Hardened with eager loading, view existence check, and try/catch
+     * so frontend receives a clear JSON error instead of a generic 500 blob.
      */
     public function exportToPDF($id)
     {
-        $user   = Auth::user();
-        $review = PerformanceReview::findOrFail($id);
+        $user = Auth::user();
+
+        // Eager-load relations used in the PDF to avoid lazy-loading issues.
+        $review = PerformanceReview::with(['employee', 'reviewer'])->findOrFail($id);
 
         // Same permission check as `show`
         if (
-            ($user->role->name === 'employee'      && $review->employee_id === $user->id) ||
-            (in_array($user->role->name, ['hr_worker', 'administrator']) &&
-             $review->reviewer_id === $user->id)
+            !(
+                ($user->role->name === 'employee' && $review->employee_id === $user->id) ||
+                (in_array($user->role->name, ['hr_worker', 'administrator']) && $review->reviewer_id === $user->id)
+            )
         ) {
-            $pdf = Pdf::setOptions([
-                'isRemoteEnabled'    => true,  // 🔑 allow http(s) images
-                'isHtml5ParserEnabled'=> true, // better CSS support
-            ])->loadView('pdf.performance_review', [
-                'review' => $review,
-            ]);
-
-            return $pdf
-                ->download("performance_review_{$review->id}.pdf");
+            return response()->json(['error' => 'Nemate dozvolu.'], 403);
         }
 
-        return response()->json(['error' => 'Nemate dozvolu.'], 403);
+        try {
+            // Ensure the view exists; fail fast with a readable message.
+            $viewName = 'pdf.performance_review';
+            if (! View::exists($viewName)) {
+                return response()->json([
+                    'message' => 'PDF view ne postoji.',
+                    'hint'    => "Kreirajte resources/views/pdf/performance_review.blade.php"
+                ], 500);
+            }
+
+            $pdf = Pdf::setOptions([
+                'isRemoteEnabled'     => true,   // allow http(s) images if you add logos
+                'isHtml5ParserEnabled'=> true,   // better CSS support
+            ])->loadView($viewName, [
+                'review' => $review, // Blade can use optional() to guard nulls
+            ])->setPaper('a4');
+
+            // You can also return ->stream() if you prefer inline
+            return $pdf->download("performance_review_{$review->id}.pdf");
+        } catch (\Throwable $e) {
+            // Return JSON so the frontend can display the real error
+            return response()->json([
+                'message' => 'Neuspešno generisanje PDF-a.',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
     }
 }
