@@ -25,9 +25,13 @@ export default function Breadcrumbs() {
   const brandDark = '#0D0E10';
   const brandWhite = '#FFFFFF';
 
+
+  const stored = JSON.parse(sessionStorage.getItem('user') || '{}');
+  const roleName = stored.name;
+
   const isAdminHome = pathname.startsWith('/admin-dashboard');
-  const homePath    = isAdminHome ? '/admin-dashboard' : '/home';
-  const homeLabel   = isAdminHome ? 'Admin Dashboard' : 'Home';
+  const homePath    = isAdminHome || roleName === 'admin' ? '/admin-dashboard' : '/home';
+  const homeLabel   = isAdminHome || roleName === 'admin' ? 'Admin Dashboard' : 'Home';
 
   if (
     parts.length === 0 ||
