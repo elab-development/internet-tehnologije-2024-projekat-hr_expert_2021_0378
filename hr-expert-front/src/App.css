@@ -1,0 +1,28 @@
+/* src/App.css */
+body, #root {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+input::-webkit-input-placeholder {
+  color: #E5E5E5;
+}
+
+input:-ms-input-placeholder {
+  color: #E5E5E5;
+}
+
+input::placeholder {
+  color: #E5E5E5;
+}
+
+/* subtle animation */
+.chakra-stack {
+  animation: fadeInUp 0.5s ease-out both;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
